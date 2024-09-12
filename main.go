@@ -14,12 +14,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
-// Get ECS task for the specified service
 func getECSTask(svc *ecs.Client, clusterName, serviceName string) (string, string, error) {
 	input := &ecs.ListTasksInput{
 		Cluster:       aws.String(clusterName),
 		ServiceName:   aws.String(serviceName),
-		DesiredStatus: types.DesiredStatusRunning, // Use the correct DesiredStatus enum
+		DesiredStatus: types.DesiredStatusRunning,
 	}
 	result, err := svc.ListTasks(context.TODO(), input)
 	if err != nil || len(result.TaskArns) == 0 {
@@ -27,7 +26,6 @@ func getECSTask(svc *ecs.Client, clusterName, serviceName string) (string, strin
 	}
 	taskArn := result.TaskArns[0]
 
-	// Describe the task to get container instance ARN
 	describeInput := &ecs.DescribeTasksInput{
 		Cluster: aws.String(clusterName),
 		Tasks:   []string{taskArn},
@@ -40,7 +38,6 @@ func getECSTask(svc *ecs.Client, clusterName, serviceName string) (string, strin
 	return taskArn, *containerInstanceArn, nil
 }
 
-// Get the EC2 instance ID from the container instance ARN
 func getEC2InstanceID(svc *ecs.Client, clusterName, containerInstanceArn string) (string, error) {
 	input := &ecs.DescribeContainerInstancesInput{
 		Cluster:            aws.String(clusterName),
@@ -53,7 +50,6 @@ func getEC2InstanceID(svc *ecs.Client, clusterName, containerInstanceArn string)
 	return *result.ContainerInstances[0].Ec2InstanceId, nil
 }
 
-// Get the container ID for the specified container name
 func getContainerID(svc *ecs.Client, clusterName, taskArn, containerName string) (string, error) {
 	describeInput := &ecs.DescribeTasksInput{
 		Cluster: aws.String(clusterName),
@@ -71,14 +67,13 @@ func getContainerID(svc *ecs.Client, clusterName, taskArn, containerName string)
 	return "", fmt.Errorf("no container named %s found in task", containerName)
 }
 
-// Start an SSM session to connect to the container
 func startSSMSession(instanceID, containerID string, profile *string, region string) error {
 	ssmCmd := []string{
 		"aws", "ssm", "start-session",
 		"--target", instanceID,
 		"--document-name", "AWS-StartInteractiveCommand",
 		"--parameters", fmt.Sprintf("command=\"sudo docker exec -it %s bash\"", containerID),
-		"--region", region, // Add region explicitly
+		"--region", region,
 	}
 	if profile != nil {
 		ssmCmd = append(ssmCmd, "--profile", *profile)
@@ -91,7 +86,6 @@ func startSSMSession(instanceID, containerID string, profile *string, region str
 }
 
 func main() {
-	// Define command-line flags
 	clusterName := flag.String("cluster", "", "The ECS cluster name")
 	serviceName := flag.String("service", "", "The ECS service name")
 	containerName := flag.String("container", "", "The container name")
@@ -99,15 +93,13 @@ func main() {
 
 	flag.Parse()
 
-	// Check required flags
 	if *serviceName == "" || *containerName == "" {
-		log.Fatal("Usage: go run main.go --cluster <cluster-name> --service <service-name> --container <container-name> [--profile <aws-profile>]")
+		log.Fatal("Usage: docker-connector --cluster <cluster-name> --service <service-name> --container <container-name> [--profile <aws-profile>]")
 	}
 
-	// Load AWS config with region set to eu-west-2
 	var cfg aws.Config
 	var err error
-	region := "eu-west-2" // Set the region here
+	region := "eu-west-2"
 	if *profile != "" {
 		cfg, err = config.LoadDefaultConfig(context.TODO(), config.WithSharedConfigProfile(*profile), config.WithRegion(region))
 	} else {
@@ -117,31 +109,26 @@ func main() {
 		log.Fatalf("Unable to load AWS config: %v", err)
 	}
 
-	// Create ECS client
 	ecsClient := ecs.NewFromConfig(cfg)
 
-	// Get ECS task and container instance ARN
 	taskArn, containerInstanceArn, err := getECSTask(ecsClient, *clusterName, *serviceName)
 	if err != nil {
 		log.Fatalf("Error getting ECS task: %v", err)
 	}
 	fmt.Printf("Found task ARN: %s\n", taskArn)
 
-	// Get the EC2 instance ID
 	instanceID, err := getEC2InstanceID(ecsClient, *clusterName, containerInstanceArn)
 	if err != nil {
 		log.Fatalf("Error getting EC2 instance ID: %v", err)
 	}
 	fmt.Printf("Found EC2 instance ID: %s\n", instanceID)
 
-	// Get the container ID
 	containerID, err := getContainerID(ecsClient, *clusterName, taskArn, *containerName)
 	if err != nil {
 		log.Fatalf("Error getting container ID: %v", err)
 	}
 	fmt.Printf("Found container ID: %s\n", containerID)
 
-	// Start SSM session to connect to the container
 	err = startSSMSession(instanceID, containerID, profile, region)
 	if err != nil {
 		log.Fatalf("Error starting SSM session: %v", err)
