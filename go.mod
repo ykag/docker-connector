@@ -3,7 +3,7 @@ module docker-connector
 go 1.22.4
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.30.5
+	github.com/aws/aws-sdk-go-v2 v1.32.5
 	github.com/aws/aws-sdk-go-v2/config v1.27.33
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.45.4
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.52.8
@@ -20,6 +20,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.22.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.26.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.30.7 // indirect
-	github.com/aws/smithy-go v1.20.4 // indirect
+	github.com/aws/smithy-go v1.22.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 )
